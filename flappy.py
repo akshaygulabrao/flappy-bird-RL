@@ -156,6 +156,15 @@ def showWelcomeAnimation():
     playerShmVals = {'val': 0, 'dir': 1}
 
     while True:
+        if dl.playAnotherGame():
+            return {
+                'playery': playery + playerShmVals['val'],
+                'basex': basex,
+                'playerIndexGen': playerIndexGen,
+            }
+        else:
+            pygame.quit()
+            sys.exit()
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 pygame.quit()
@@ -225,10 +234,12 @@ def mainGame(movementInfo):
     playerRotThr  =  20   # rotation threshold
     playerFlapAcc =  -9   # players speed on flapping
     playerFlapped = False # True when player flaps
+    prevState = state = torch.tensor([lowerPipes[1]['x'], playery - lowerPipes[1]['y'], playerVelY, playery])
 
     while True:
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                dl.save_weights()
                 pygame.quit()
                 sys.exit()
             if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
@@ -236,32 +247,15 @@ def mainGame(movementInfo):
                     playerVelY = playerFlapAcc
                     playerFlapped = True
                     # SOUNDS['wing'].play()
-        try:
-            if jump == True and playery > -2 * IMAGES['player'][0].get_height():
-                playerVelY = playerFlapAcc
-                playerFlapped = True
-        except:
-            pass
+        prevState = state
+        action = dl.select_action(prevState)[0]
+        if  1 == action and playery > -2 * IMAGES['player'][0].get_height():
+            playerVelY = playerFlapAcc
+            playerFlapped = True
 
         # check for crash here
         crashTest = checkCrash({'x': playerx, 'y': playery, 'index': playerIndex},
                                upperPipes, lowerPipes)
-        #TODO find a good place to pass the prevState, and state to the agent
-        if crashTest[0]:
-            prevState = state
-            state = None
-            return {
-                'y': playery,
-                'groundCrash': crashTest[1],
-                'basex': basex,
-                'upperPipes': upperPipes,
-                'lowerPipes': lowerPipes,
-                'score': score,
-                'playerVelY': playerVelY,
-                'playerRot': playerRot
-            }
-        else:
-
 
         # check for score
         playerMidPos = playerx + IMAGES['player'][0].get_width() / 2
@@ -311,19 +305,15 @@ def mainGame(movementInfo):
         # player['h'] = IMAGES['player'][0].get_height()
         # distToGround = player['y'] + player['h'] - (BASEY - 1)
 
-        # TODO: set state and prevState for MDP
-        try:
-            prevState = state
-            if len(upperPipes) == 3:
-                state = (lowerPipes[1]['x'], playery - lowerPipes[1]['y'], playerVelY)
-            else:
-                state = (lowerPipes[0]['x'], playery - lowerPipes[0]['y'], playerVelY)
-        except:
-            if len(upperPipes) == 3:
-                state = (lowerPipes[1]['x'], playery - lowerPipes[1]['y'], playerVelY)
-            else:
-                state = (lowerPipes[0]['x'], playery - lowerPipes[0]['y'], playerVelY)
 
+        if crashTest[0]: state = None
+        elif len(upperPipes) == 3:
+            state = torch.tensor([lowerPipes[1]['x'], playery - lowerPipes[1]['y'], playerVelY, playery])
+        else:
+            state = torch.tensor([lowerPipes[0]['x'], playery - lowerPipes[0]['y'], playerVelY, playery])
+        reward = torch.tensor([1])
+        if crashTest[0]: reward = torch.tensor([0])
+        dl.save_MDP(prevState,action,state,reward)
         # draw sprites
         SCREEN.blit(IMAGES['background'], (0,0))
 
@@ -342,7 +332,17 @@ def mainGame(movementInfo):
         
         playerSurface = pygame.transform.rotate(IMAGES['player'][playerIndex], visibleRot)
         SCREEN.blit(playerSurface, (playerx, playery))
-
+        if crashTest[0]:
+            return {
+                'y': playery,
+                'groundCrash': crashTest[1],
+                'basex': basex,
+                'upperPipes': upperPipes,
+                'lowerPipes': lowerPipes,
+                'score': score,
+                'playerVelY': playerVelY,
+                'playerRot': playerRot
+            }
         pygame.display.update()
         FPSCLOCK.tick(FPS)
 
@@ -368,8 +368,15 @@ def showGameOverScreen(crashInfo):
     #     SOUNDS['die'].play()
 
     while True:
+        if dl.gamesTrained():
+            return
+        else:
+            dl.save_weights()
+            pygame.quit()
+            sys.exit()
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                dl.save_weights()
                 pygame.quit()
                 sys.exit()
             if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
@@ -512,4 +519,5 @@ def getHitmask(image):
     return mask
 
 if __name__ == '__main__':
+    dl.load_weights()
     main()

@@ -33,13 +33,13 @@ class DQN(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
-        self.l1 = nn.Linear(3, 2)
+        self.l1 = nn.Linear(4, 2)
 
     def forward(self, x):
         return F.relu(self.l1(x))
 
 
-BATCH_SIZE = 128
+BATCH_SIZE = 8
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
@@ -50,10 +50,19 @@ target_net = DQN()
 optimizer = optim.RMSprop(policy_net.parameters())
 memory = ReplayMemory(10000)
 steps_done = 0
+games_trained = 0
+training_epoch = 5001
 
+def save_weights():
+    torch.save(policy_net.state_dict(),'pnet.pt')
+    torch.save(target_net.state_dict(),'tnet.pt')
 
-def select_action(prevState, state):
-    print(prevState, state)
+def load_weights():
+    policy_net.load_state_dict(torch.load('pnet.pt'))
+    target_net.load_state_dict(torch.load('tnet.pt'))
+
+def select_action(state):
+    # print(prevState, state)
     global steps_done
     sample = random.random()
     eps_threshold = EPS_END + (EPS_START - EPS_END) * \
@@ -64,7 +73,8 @@ def select_action(prevState, state):
             # t.max(1) will return largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1)[1].view(1, 1)
+            print(policy_net(state))
+            return policy_net(state).max(0)[1].view(1, 1)
     else:
         return torch.tensor([[random.randrange(2)]], dtype=torch.long)
 
@@ -88,14 +98,15 @@ def optimize_model():
                                             batch.next_state)), dtype=torch.bool)
     non_final_next_states = torch.cat([s for s in batch.next_state
                                        if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
+    state_batch = torch.cat(batch.state).reshape(-1,4)
+    action_batch = torch.cat(batch.action).reshape(-1,1)
     reward_batch = torch.cat(batch.reward)
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
+    state_action_values = policy_net(state_batch)
+    state_action_values = policy_net(state_batch).gather(0, action_batch)
 
     # Compute V(s_{t+1}) for all next states.
     # Expected values of actions for non_final_next_states are computed based
@@ -103,7 +114,7 @@ def optimize_model():
     # This is merged based on the mask, such that we'll have either the expected
     # state value or 0 in case the state was final.
     next_state_values = torch.zeros(BATCH_SIZE)
-    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+    next_state_values[non_final_mask] = target_net(non_final_next_states.view(-1, 4)).max(1)[0].detach()
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -118,4 +129,22 @@ def optimize_model():
         param.grad.data.clamp_(-1, 1)
     optimizer.step()
 
-def agent_step(prevState,state):
+def agent_step(prevState):
+    return select_action(prevState)
+
+def save_MDP(prevState,action,state,reward):
+    memory.push(prevState,action,state,reward)
+    optimize_model()
+
+def gamesTrained():
+    global games_trained
+    games_trained +=1
+    print(games_trained)
+    if games_trained % TARGET_UPDATE == 0:
+        target_net.load_state_dict(policy_net.state_dict())
+    return games_trained < training_epoch
+
+def playAnotherGame():
+    global games_trained
+    return games_trained < training_epoch
+
