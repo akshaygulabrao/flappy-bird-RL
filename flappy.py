@@ -244,14 +244,20 @@ def mainGame(movementInfo):
                 sys.exit()
             if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
                 if playery > -2 * IMAGES['player'][0].get_height():
-                    playerVelY = playerFlapAcc
+                    # playerVelY = playerFlapAcc
+                    playery-=20
+                    playerFlapped = True
+            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_DOWN):
+                if playery > -2 * IMAGES['player'][0].get_height():
+                    # playerVelY = playerFlapAcc
+                    playery+=20
                     playerFlapped = True
                     # SOUNDS['wing'].play()
         prevState = state
-        action = dl.select_action(prevState)[0]
-        if  1 == action and playery > -2 * IMAGES['player'][0].get_height():
-            playerVelY = playerFlapAcc
-            playerFlapped = True
+        # action = dl.select_action(prevState)[0]
+        # if  1 == action and playery > -2 * IMAGES['player'][0].get_height():
+        #     playerVelY = playerFlapAcc
+        #     playerFlapped = True
 
         # check for crash here
         crashTest = checkCrash({'x': playerx, 'y': playery, 'index': playerIndex},
@@ -271,20 +277,20 @@ def mainGame(movementInfo):
         basex = -((-basex + 100) % baseShift)
 
         # rotate the player
-        if playerRot > -90:
-            playerRot -= playerVelRot
+        # if playerRot > -90:
+        #     playerRot -= playerVelRot
 
         # player's movement
-        if playerVelY < playerMaxVelY and not playerFlapped:
-            playerVelY += playerAccY
+        # if playerVelY < playerMaxVelY and not playerFlapped:
+        #     playerVelY += playerAccY
         if playerFlapped:
             playerFlapped = False
 
             # more rotation to cover the threshold (calculated in visible rotation)
-            playerRot = 45
+            # playerRot = 45
 
         playerHeight = IMAGES['player'][playerIndex].get_height()
-        playery += min(playerVelY, BASEY - playery - playerHeight)
+        # playery += min(playerVelY, BASEY - playery - playerHeight)
 
         # move pipes to left
         for uPipe, lPipe in zip(upperPipes, lowerPipes):
@@ -313,7 +319,7 @@ def mainGame(movementInfo):
             state = torch.tensor([lowerPipes[0]['x'], playery - lowerPipes[0]['y'], playerVelY, playery])
         reward = torch.tensor([1])
         if crashTest[0]: reward = torch.tensor([0])
-        dl.save_MDP(prevState,action,state,reward)
+        # dl.save_MDP(prevState,action,state,reward)
         # draw sprites
         SCREEN.blit(IMAGES['background'], (0,0))
 
@@ -327,8 +333,8 @@ def mainGame(movementInfo):
 
         # Player rotation has a threshold
         visibleRot = playerRotThr
-        if playerRot <= playerRotThr:
-            visibleRot = playerRot
+        # if playerRot <= playerRotThr:
+        #     visibleRot = playerRot
         
         playerSurface = pygame.transform.rotate(IMAGES['player'][playerIndex], visibleRot)
         SCREEN.blit(playerSurface, (playerx, playery))
