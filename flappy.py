@@ -4,6 +4,7 @@ import sys
 import pygame
 from pygame.locals import *
 import dl
+import matplotlib.pyplot as plt
 import torch
 
 FPS = 30
@@ -222,6 +223,7 @@ def mainGame(movementInfo):
     dt = FPSCLOCK.tick(FPS)/1000
     dt = 0.033
     pipeVelX = -128 * dt
+    ticksSurvived = 0
     # print(dt)
 
     # player velocity, max velocity, downward acceleration, acceleration on flap
@@ -254,7 +256,12 @@ def mainGame(movementInfo):
                     playerFlapped = True
                     # SOUNDS['wing'].play()
         prevState = state
-        # action = dl.select_action(prevState)[0]
+        action = dl.select_action(prevState)[0]
+        if action == 1 and playery > -2 * IMAGES['player'][0].get_height():
+            playery-=20
+        elif action == 2 and playery > -2 * IMAGES['player'][0].get_height():
+            playery+=20
+
         # if  1 == action and playery > -2 * IMAGES['player'][0].get_height():
         #     playerVelY = playerFlapAcc
         #     playerFlapped = True
@@ -347,8 +354,10 @@ def mainGame(movementInfo):
                 'lowerPipes': lowerPipes,
                 'score': score,
                 'playerVelY': playerVelY,
-                'playerRot': playerRot
+                'playerRot': playerRot,
+                'ticksSurvived': ticksSurvived
             }
+        ticksSurvived+=1
         pygame.display.update()
         FPSCLOCK.tick(FPS)
 
@@ -375,6 +384,9 @@ def showGameOverScreen(crashInfo):
 
     while True:
         if dl.gamesTrained():
+            dl.performance_list.append(crashInfo['ticksSurvived'])
+            plt.scatter(list(range(len(dl.performance_list))),dl.performance_list)
+            plt.pause(0.01)
             return
         else:
             dl.save_weights()

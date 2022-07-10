@@ -33,18 +33,18 @@ class DQN(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
-        self.l1 = nn.Linear(4, 2)
+        self.l1 = nn.Linear(4, 3)
 
     def forward(self, x):
         return F.relu(self.l1(x))
 
 
-BATCH_SIZE = 8
+BATCH_SIZE = 100
 GAMMA = 0.999
-EPS_START = 0.9
-EPS_END = 0.05
+EPS_START = 0.5
+EPS_END = 0.01
 EPS_DECAY = 200
-TARGET_UPDATE = 10
+TARGET_UPDATE = 20
 policy_net = DQN()
 target_net = DQN()
 optimizer = optim.RMSprop(policy_net.parameters())
@@ -52,14 +52,18 @@ memory = ReplayMemory(10000)
 steps_done = 0
 games_trained = 0
 training_epoch = 5001
+performance_list = []
 
 def save_weights():
     torch.save(policy_net.state_dict(),'pnet.pt')
     torch.save(target_net.state_dict(),'tnet.pt')
 
 def load_weights():
-    policy_net.load_state_dict(torch.load('pnet.pt'))
-    target_net.load_state_dict(torch.load('tnet.pt'))
+    try:
+        policy_net.load_state_dict(torch.load('pnet.pt'))
+        target_net.load_state_dict(torch.load('tnet.pt'))
+    except:
+        pass
 
 def select_action(state):
     # print(prevState, state)
@@ -73,10 +77,10 @@ def select_action(state):
             # t.max(1) will return largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            print(policy_net(state))
+            # print(policy_net(state))
             return policy_net(state).max(0)[1].view(1, 1)
     else:
-        return torch.tensor([[random.randrange(2)]], dtype=torch.long)
+        return torch.tensor([[random.randrange(3)]], dtype=torch.long)
 
 
 def jump():
